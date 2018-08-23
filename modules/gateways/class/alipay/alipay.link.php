@@ -2,9 +2,7 @@
 if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
-
 use Illuminate\Database\Capsule\Manager as Capsule;
-
 class alipay_link {
     public function get_paylink($params){
         if (!function_exists("openssl_open")){
@@ -27,7 +25,6 @@ class alipay_link {
                 return $this->QrPay($params);	
         }
     }
-
     public function PcPay($params){
         require_once __DIR__ ."/alipay.class.php";
 		
@@ -45,7 +42,6 @@ class alipay_link {
 	
     public function QrPay($params){
 		require_once __DIR__ ."/alipay.class.php";
-
         $aliPay = new QrPayService();
 		$aliPay->setAppid($params['app_id']);
 		$aliPay->setNotifyUrl($params['systemurl']."/modules/gateways/callback/alipay.php");
@@ -56,19 +52,18 @@ class alipay_link {
 		
 		$result = $aliPay->doPay();		
 		$result = $result['alipay_trade_precreate_response'];
-
 		if($result['msg'] && $result['msg']=='Success'){
-			$qr_code = 'https://www.kuaizhan.com/common/encode-png?large=true&data='.$result['qr_code'];
 			$status = '
 			<!--
 				可用变量
-				$id       - 账单ID
 				$qr_url   - 支付链接
-				$qr_code  - 二维码
 
 			-->
 			<script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+			<script src="https://cdn.bootcss.com/jquery.qrcode/1.0/jquery.qrcode.min.js"></script>
+			<a href= "{$qr_url}" ><div id= "qrcode" ></div><br>请打开支付宝扫码</a>
 			<script>
+			$("#qrcode").qrcode({width:180,height:180,text:"{$qr_url}"});
 			setTimeout(stop, 300000);
 			function stop()
 			{
@@ -78,9 +73,9 @@ class alipay_link {
 			var paid_timeout = setInterval(go, 3000);
 			function go()
 			{
-				$.get("/viewinvoice.php?id={$id}",function(data)
+				$.get(window.location.href,function(data)
 					{
-						if (data.indexOf("unpaid") == -1)
+						if (data.search(/<span\sclass=.paid.>/) != -1)
 						{
 							clearInterval(paid_timeout);
 							alert("支付完成");
@@ -89,9 +84,8 @@ class alipay_link {
 					}
 				);
 			}
-			</script>
-			<a href= "{$qr_url}" ><img src= "{$qr_code}" /><br>请打开支付宝扫码</a>';
-			$status_raw = str_replace(['{$id}','{$qr_url}','{$qr_code}'],[$params['invoiceid'],$result['qr_code'],$qr_code],$status);
+			</script>';
+			$status_raw = str_replace('{$qr_url}',$result['qr_code'],$status);
             return $status_raw;
 		}else{
 			return $result['msg'].' : '.$result['sub_msg'];
